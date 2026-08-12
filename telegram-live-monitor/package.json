@@ -1,0 +1,12 @@
+{
+  "name": "telegram-live-monitor-bot",
+  "version": "1.0.0",
+  "description": "Telegram Live Stream Monitor Bot — Auto DM viewers when channels go live",
+  "scripts": {
+    "start": "python start.py",
+    "bot": "python bot.py"
+  },
+  "engines": {
+    "python": "3.11"
+  }
+}

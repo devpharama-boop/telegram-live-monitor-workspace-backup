@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Stream Monitor Bot</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a25;
+            --border: #1e1e2e;
+            --text: #e0e0e0;
+            --text-muted: #8888aa;
+            --accent: #6c5ce7;
+            --accent-glow: #a29bfe;
+            --green: #00d2a0;
+            --red: #ff4757;
+            --orange: #ffa502;
+            --blue: #3742fa;
+            --gold: #ffd700;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .bg-grid {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image:
+                linear-gradient(rgba(108,92,231,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(108,92,231,0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none; z-index: 0;
+        }
+
+        .bg-glow {
+            position: fixed; width: 500px; height: 500px; border-radius: 50%;
+            filter: blur(150px); opacity: 0.08; pointer-events: none; z-index: 0;
+        }
+        .bg-glow-1 { top: -200px; left: -100px; background: var(--accent); }
+        .bg-glow-2 { bottom: -200px; right: -100px; background: var(--green); }
+
+        .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+
+        .header { text-align: center; padding: 20px 0 10px; }
+        .header .welcome { font-size: 14px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+        .header .username { font-size: 26px; font-weight: 700; background: linear-gradient(135deg, var(--accent-glow), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .header .bot-title { font-size: 13px; color: var(--accent-glow); letter-spacing: 2px; margin-top: 2px; text-transform: uppercase; }
+
+        .stats-row { display: flex; gap: 10px; margin: 16px 0; }
+        .stat-card {
+            flex: 1; background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 14px 10px; text-align: center; transition: all 0.3s; cursor: pointer;
+        }
+        .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .stat-card .stat-icon { font-size: 22px; margin-bottom: 4px; }
+        .stat-card .stat-value { font-size: 22px; font-weight: 700; color: #fff; }
+        .stat-card .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+        .arrow-hint { text-align: center; margin: 12px 0; color: var(--text-muted); font-size: 20px; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+
+        .button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+        .btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 6px; padding: 18px 12px; border: 1px solid var(--border); border-radius: 16px;
+            background: var(--bg-card); color: var(--text); cursor: pointer;
+            transition: all 0.25s; min-height: 80px;
+        }
+        .btn:hover { background: var(--bg-card-hover); border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(108,92,231,0.15); }
+        .btn:active { transform: scale(0.97); }
+        .btn .btn-icon { font-size: 28px; }
+        .btn .btn-text { font-size: 13px; font-weight: 600; letter-spacing: 0.5px; }
+        .btn .btn-sub { font-size: 10px; color: var(--text-muted); }
+        .btn.accent { border-color: rgba(108,92,231,0.4); background: linear-gradient(135deg, rgba(108,92,231,0.1), rgba(108,92,231,0.02)); }
+        .btn.admin-btn { border-color: rgba(255,215,0,0.4); background: linear-gradient(135deg, rgba(255,215,0,0.08), rgba(255,215,0,0.02)); grid-column: 1 / -1; }
+        .btn.admin-btn:hover { border-color: var(--gold); box-shadow: 0 8px 25px rgba(255,215,0,0.12); }
+
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px;
+            padding: 24px; width: 90%; max-width: 420px; max-height: 80vh; overflow-y: auto;
+            position: relative;
+        }
+        .modal h3 { font-size: 20px; margin-bottom: 16px; text-align: center; }
+        .modal .close-btn { position: absolute; top: 12px; right: 16px; background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; }
+        .modal .close-btn:hover { color: var(--text); }
+
+        .input-group { margin-bottom: 14px; }
+        .input-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+        .input-group input, .input-group textarea {
+            width: 100%; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 10px; color: var(--text); font-size: 14px; font-family: inherit; outline: none;
+        }
+        .input-group input:focus, .input-group textarea:focus { border-color: var(--accent); }
+        .input-group textarea { min-height: 80px; resize: vertical; }
+
+        .btn-submit {
+            width: 100%; padding: 14px; background: var(--accent); color: #fff;
+            border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px;
+        }
+        .btn-submit:hover { background: #7c6ff7; box-shadow: 0 4px 20px rgba(108,92,231,0.3); }
+        .btn-submit.green { background: var(--green); }
+        .btn-submit.red { background: var(--red); }
+        .btn-submit.orange { background: var(--orange); }
+
+        .channel-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+        }
+        .channel-item:hover { border-color: var(--accent); }
+        .channel-item .ch-info { display: flex; align-items: center; gap: 10px; }
+        .channel-item .ch-name { font-weight: 600; font-size: 14px; }
+        .channel-item .ch-stats { font-size: 11px; color: var(--text-muted); }
+
+        .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); animation: pulse 1.5s infinite; flex-shrink: 0; }
+        @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+        .live-dot.offline { background: #555; animation: none; }
+
+        .viewer-stats { display: flex; gap: 10px; margin: 10px 0; }
+        .viewer-stat { flex: 1; text-align: center; padding: 10px; background: var(--bg); border-radius: 10px; }
+        .viewer-stat .val { font-size: 20px; font-weight: 700; }
+        .viewer-stat .lbl { font-size: 10px; color: var(--text-muted); }
+
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: var(--bg-card); border: 1px solid var(--accent); padding: 12px 24px;
+            border-radius: 12px; font-size: 14px; z-index: 2000; opacity: 0;
+            transition: opacity 0.3s; pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+
+        .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .msg-preview { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin: 10px 0; font-size: 13px; white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow-y: auto; }
+        .msg-preview img { max-width: 100%; border-radius: 8px; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="app">
+        <div class="header">
+            <div class="welcome">Welcome,</div>
+            <div class="username" id="usernameDisplay">Admin</div>
+            <div class="bot-title">⚡ Live Stream Monitor Bot</div>
+        </div>
+
+        <div id="dmWarning" style="display:none;padding:10px;margin:0 0 12px 0;background:rgba(255,71,87,0.12);border:1px solid var(--red);border-radius:10px;font-size:12px;text-align:center;">
+            ⚠️ <strong>DM message not set!</strong> DMs won't be sent. <a onclick="openModal('setMessageModal')" style="color:var(--accent-glow);cursor:pointer;text-decoration:underline;">Set it here</a>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card" onclick="openModal('accountsModal')">
+                <div class="stat-icon">👤</div>
+                <div class="stat-value" id="statAccounts">0</div>
+                <div class="stat-label">Accounts</div>
+            </div>
+            <div class="stat-card" onclick="openModal('channelsModal')">
+                <div class="stat-icon">📺</div>
+                <div class="stat-value" id="statChannels">0</div>
+                <div class="stat-label">Channels</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔴</div>
+                <div class="stat-value" id="statMonitoring">0</div>
+                <div class="stat-label">Monitoring</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✉️</div>
+                <div class="stat-value" id="statDmSent">0</div>
+                <div class="stat-label">DM Sent</div>
+            </div>
+        </div>
+
+        <div class="arrow-hint">⬇ Use buttons below ⬇</div>
+
+        <div class="button-grid">
+            <button class="btn" onclick="openModal('addChannelModal')">
+                <span class="btn-icon">➕</span><span class="btn-text">Add Channel</span>
+                <span class="btn-sub">Join & monitor</span>
+            </button>
+            <button class="btn accent" onclick="openModal('liveMonitorModal')">
+                <span class="btn-icon">🔴</span><span class="btn-text">Live Monitor</span>
+                <span class="btn-sub">Active streams</span>
+            </button>
+            <button class="btn" onclick="openModal('setMessageModal')">
+                <span class="btn-icon">💬</span><span class="btn-text">Set Message</span>
+                <span class="btn-sub">Edit DM text</span>
+            </button>
+            <button class="btn accent" onclick="openModal('dashboardModal')">
+                <span class="btn-icon">📊</span><span class="btn-text">Dashboard</span>
+                <span class="btn-sub">Full stats</span>
+            </button>
+            <button class="btn" onclick="openModal('accountsModal')">
+                <span class="btn-icon">👤</span><span class="btn-text">Account</span>
+                <span class="btn-sub">Manage</span>
+            </button>
+            <button class="btn" onclick="openModal('helpModal')">
+                <span class="btn-icon">ℹ️</span><span class="btn-text">Help</span>
+                <span class="btn-sub">Guide</span>
+            </button>
+        </div>
+
+        <button class="btn admin-btn" onclick="openModal('adminModal')">
+            <span class="btn-icon">🛡️</span><span class="btn-text">Admin Panel</span>
+            <span class="btn-sub">Manage admins</span>
+        </button>
+    </div>
+
+    <!-- ========== MODALS ========== -->
+    <!-- Add Channel (Multi-Step Flow) -->
+    <div class="modal-overlay" id="addChannelModal">
+        <div class="modal"><button class="close-btn" onclick="closeModal('addChannelModal')">✕</button>
+            <h3>➕ Add Channel</h3>
+            <!-- Step 1: Check joined status -->
+            <div id="addChannelStep1">
+                <div class="input-group"><label>Channel ID (@username or -100xxx)</label><input type="text" id="channelInput" placeholder="@channel_username or -1004368116984"></div>
+                <p style="text-align:center;color:var(--text-muted);margin:8px 0;">— OR —</p>
+                <button class="btn-submit" onclick="showInviteLink()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);">🔗 Use Invite Link</button>
+                <div id="inviteLinkSection" style="display:none;margin-top:10px;">
+                    <div class="input-group"><label>Invite Link</label><input type="text" id="inviteLinkInput" placeholder="https://t.me/+abcdef..."></div>
+                </div>
+                <button class="btn-submit" onclick="checkAndAddChannel()" style="margin-top:12px;">🔍 Check & Add</button>
+            </div>
+            <div id="addChannelResult" style="margin-top:10px;font-size:13px;"></div>
+            <div id="addChannelStep2" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="liveMonitorModal"><div class="modal"><button class="close-btn" onclick="closeModal('liveMonitorModal')">✕</button><h3>🔴 Live Monitor</h3><div id="liveMonitorContent"><div class="spinner"></div></div></div></div>
+
+    <div class="modal-overlay" id="setMessageModal"><div class="modal"><button class="close-btn" onclick="closeModal('setMessageModal')">✕</button><h3>💬 Set Message</h3><div class="input-group"><label>Message Text</label><textarea id="dmMessageText" placeholder="Enter DM message..."></textarea></div><div class="input-group"><label>Image URL (optional)</label><input type="text" id="dmImageUrl" placeholder="https://example.com/image.jpg"></div><div id="dmPreview" class="msg-preview" style="display:none;"></div><button class="btn-submit" onclick="saveDmMessage()">💾 Save</button><button class="btn-submit orange" onclick="resetDmRecords()" style="margin-top:8px;">🗑️ Reset DM Records</button><div id="dmResult" style="margin-top:10px;font-size:13px;"></div></div></div>
+
+    <div class="modal-overlay" id="dashboardModal"><div class="modal"><button class="close-btn" onclick="closeModal('dashboardModal')">✕</button><h3>📊 Dashboard</h3><div id="dashboardContent"><div class="spinner"></div></div></div></div>
+
+    <div class="modal-overlay" id="channelsModal"><div class="modal"><button class="close-btn" onclick="closeModal('channelsModal')">✕</button><h3>📺 All Channels</h3><div id="channelsListContent"><div class="spinner"></div></div></div></div>
+
+    <div class="modal-overlay" id="accountsModal"><div class="modal"><button class="close-btn" onclick="closeModal('accountsModal')">✕</button><h3>👤 Accounts</h3><div id="accountsContent"></div><button class="btn-submit" onclick="showAddAccountForm()" style="margin-top:10px;">➕ Add Account</button><div id="addAccountForm" style="display:none;margin-top:12px;"><div class="input-group"><label>Phone Number</label><input type="text" id="accountPhone" placeholder="+919876543210"></div><button class="btn-submit green" id="sendOtpBtn" onclick="sendOTP()">📱 Send OTP</button><div id="otpSection" style="display:none;margin-top:12px;"><div class="input-group"><label>OTP Code</label><input type="text" id="otpCode" placeholder="12345"></div><div class="input-group"><label>2FA Password (optional)</label><input type="password" id="twoFAPassword"></div><button class="btn-submit" onclick="verifyOTP()">✅ Verify & Login</button></div><div id="accountResult" style="margin-top:10px;font-size:13px;"></div></div></div></div>
+
+    <div class="modal-overlay" id="helpModal"><div class="modal"><button class="close-btn" onclick="closeModal('helpModal')">✕</button><h3>ℹ️ Help</h3><div style="font-size:13px;line-height:1.7;"><p><strong>🔴 Live Monitor Bot</strong> auto-sends DMs when channels go live.</p><br><p><strong>How to use:</strong></p><ol style="padding-left:20px;"><li>Add Telegram account via <strong>Account</strong></li><li>Add channels via <strong>Add Channel</strong></li><li>Set DM message via <strong>Set Message</strong></li><li>Bot auto-monitors & sends DMs!</li></ol><br><p><strong>⚠️ Each user gets DM once per session.</strong> Reset DM Records to allow re-DM.</p><p style="color:var(--text-muted);margin-top:8px;">Bot commands: /start /stats /channels /setmsg /resetdm</p></div></div></div>
+
+    <div class="modal-overlay" id="adminModal"><div class="modal"><button class="close-btn" onclick="closeModal('adminModal')">✕</button><h3>🛡️ Admin Panel</h3><div id="adminContent"><div class="spinner"></div></div><div class="input-group" style="margin-top:14px;"><label>Add Admin (User ID)</label><input type="number" id="newAdminId" placeholder="5844447576"></div><button class="btn-submit" onclick="addAdmin()">➕ Add Admin</button><div id="adminResult" style="margin-top:10px;font-size:13px;"></div></div></div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ============ HELPERS ============
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+            if (id === 'liveMonitorModal') loadLiveMonitor();
+            if (id === 'dashboardModal') loadDashboard();
+            if (id === 'channelsModal') loadChannelsList();
+            if (id === 'accountsModal') loadAccounts();
+            if (id === 'adminModal') loadAdmin();
+            if (id === 'setMessageModal') loadDmConfig();
+        }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        function showToast(msg, duration = 2500) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), duration);
+        }
+
+        async function api(url, method = 'GET', body = null) {
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            const resp = await fetch(url, opts);
+            return resp.json();
+        }
+
+        // ============ LOAD STATS ============
+        async function loadStats() {
+            try {
+                const res = await api('/api/stats');
+                if (res.success) {
+                    const d = res.data;
+                    document.getElementById('statAccounts').textContent = d.total_accounts;
+                    document.getElementById('statChannels').textContent = d.total_channels;
+                    document.getElementById('statMonitoring').textContent = d.active_lives;
+                    document.getElementById('statDmSent').textContent = d.total_dm_sent;
+                    // Show DM warning if not configured
+                    const warn = document.getElementById('dmWarning');
+                    if (d.dm_configured) { warn.style.display = 'none'; }
+                    else { warn.style.display = 'block'; }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ============ ADD CHANNEL (Multi-Step Flow) ============
+        function showInviteLink() {
+            document.getElementById('inviteLinkSection').style.display = 'block';
+        }
+
+        async function checkAndAddChannel() {
+            const username = document.getElementById('channelInput').value.trim();
+            const inviteLink = document.getElementById('inviteLinkInput').value.trim();
+            const r = document.getElementById('addChannelResult');
+            const step2 = document.getElementById('addChannelStep2');
+
+            const isInvite = !!inviteLink;
+            const input = isInvite ? inviteLink : username;
+
+            if (!input) {
+                r.innerHTML = '<span style="color:var(--red);">❌ Enter channel username OR invite link</span>';
+                return;
+            }
+
+            r.innerHTML = '<div class="spinner"></div><p style="text-align:center;color:var(--text-muted);">⏳ Checking & joining with ALL accounts...</p>';
+
+            try {
+                const res = await api('/api/channels', 'POST', {
+                    channel_input: username,
+                    invite_link: isInvite ? inviteLink : '',
+                    is_invite: isInvite
+                });
+
+                if (res.success) {
+                    let detailHtml = '<span style="color:var(--green);">✅ Channel added successfully!</span><br>';
+                    detailHtml += '<div style="margin-top:8px;padding:10px;background:var(--bg);border-radius:8px;font-size:12px;">';
+                    detailHtml += '<strong>' + res.channel.title + '</strong><br>';
+                    detailHtml += '📊 Accounts joined: <strong>' + res.accounts_joined + '/' + res.total_accounts + '</strong><br>';
+                    if (res.was_already_joined) detailHtml += 'ℹ️ Was already joined<br>';
+                    detailHtml += '</div>';
+
+                    // Show join details per account
+                    if (res.join_details) {
+                        detailHtml += '<div style="margin-top:6px;font-size:10px;color:var(--text-muted);">';
+                        Object.entries(res.join_details).forEach(([uid, info]) => {
+                            const icon = info.success ? '✅' : '❌';
+                            detailHtml += icon + ' Account ' + uid + ': ' + (info.message || info.error) + '<br>';
+                        });
+                        detailHtml += '</div>';
+                    }
+
+                    r.innerHTML = detailHtml;
+                    document.getElementById('channelInput').value = '';
+                    document.getElementById('inviteLinkInput').value = '';
+                    document.getElementById('inviteLinkSection').style.display = 'none';
+                    showToast('Channel added — monitoring started!');
+                    loadStats();
+                } else {
+                    r.innerHTML = '<span style="color:var(--red);">❌ ' + res.error + '</span>';
+                }
+            } catch (e) {
+                r.innerHTML = '<span style="color:var(--red);">❌ Error: ' + e.message + '</span>';
+            }
+        }
+
+        async function removeChannel(channelId) {
+            if (!confirm('Remove this channel?')) return;
+            await api('/api/channels/' + channelId, 'DELETE');
+            showToast('Channel removed'); loadStats(); loadLiveMonitor();
+        }
+
+        // ============ LIVE MONITOR ============
+        async function loadLiveMonitor() {
+            const container = document.getElementById('liveMonitorContent');
+            try {
+                const res = await api('/api/stats');
+                if (!res.success) { container.innerHTML = '<p style="color:var(--red);">Failed to load</p>'; return; }
+                const channels = res.data.channels;
+                if (!res.data.dm_configured) {
+                    container.innerHTML = '<div style="padding:10px;background:rgba(255,71,87,0.1);border:1px solid var(--red);border-radius:8px;margin-bottom:10px;font-size:12px;">⚠️ <strong>DM message not set!</strong> DMs won\'t be sent. Go to <strong>Set Message</strong>.</div>';
+                } else if (!channels.length) {
+                    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px;">No channels yet.<br>Use <strong>Add Channel</strong> to start.</p>';
+                } else {
+                    let html = '';
+                    channels.forEach(ch => {
+                        const isLive = ch.is_live;
+                        html += '<div class="channel-item" onclick="viewChannelDetails(\'' + ch.id + '\', \'' + ch.title.replace(/'/g, "\\'") + '\')"><div class="ch-info"><div class="live-dot ' + (isLive ? '' : 'offline') + '"></div><div><div class="ch-name">' + ch.title + '</div><div class="ch-stats">' + (isLive ? '🔴 LIVE • ' + ch.current_viewers + ' viewers' : '⚫ Offline') + ' • ' + ch.total_dm_sent + ' DMs sent from ' + (ch.total_accounts || '?') + ' accounts</div></div></div><span style="color:var(--text-muted);font-size:18px;">→</span></div>';
+                    });
+                    container.innerHTML = html;
+                }
+            } catch (e) { container.innerHTML = '<p style="color:var(--red);">Error: ' + e.message + '</p>'; }
+        }
+
+        function viewChannelDetails(channelId, title) {
+            api('/api/stats').then(res => {
+                const ch = res.data.channels.find(c => c.id === channelId);
+                if (!ch) return;
+                const isLive = ch.is_live;
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay active';
+                overlay.innerHTML = '<div class="modal"><button class="close-btn" onclick="this.closest(\'.modal-overlay\').remove()">✕</button><h3>' + title + '</h3><div class="viewer-stats"><div class="viewer-stat"><div class="val" style="color:' + (isLive ? 'var(--red)' : '#555') + ';">' + (isLive ? '🔴 LIVE' : '⚫ OFF') + '</div><div class="lbl">Status</div></div><div class="viewer-stat"><div class="val">' + (ch.current_viewers || 0) + '</div><div class="lbl">Viewers</div></div><div class="viewer-stat"><div class="val">' + ch.total_dm_sent + '</div><div class="lbl">DMs Sent</div></div><div class="viewer-stat"><div class="val">' + ch.unique_dmed + '</div><div class="lbl">Unique DMed</div></div></div><button class="btn-submit red" onclick="removeChannel(\'' + channelId + '\');this.closest(\'.modal-overlay\').remove();">🗑️ Remove Channel</button></div>';
+                overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+                document.body.appendChild(overlay);
+            });
+        }
+
+        // ============ CHANNELS LIST ============
+        async function loadChannelsList() {
+            const container = document.getElementById('channelsListContent');
+            try {
+                const res = await api('/api/stats');
+                if (!res.success || !res.data.channels.length) {
+                    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px;">No channels added.</p>';
+                    return;
+                }
+                let html = '';
+                res.data.channels.forEach(ch => {
+                    html += '<div class="channel-item"><div class="ch-info"><div class="live-dot ' + (ch.is_live ? '' : 'offline') + '"></div><div><div class="ch-name">' + ch.title + '</div><div class="ch-stats">' + ch.total_dm_sent + ' DMs • Joined ' + (ch.joined_at || '').slice(0,10) + '</div></div></div><button class="btn-submit red" style="width:auto;padding:6px 12px;font-size:11px;" onclick="removeChannel(\'' + ch.id + '\');closeModal(\'channelsModal\');">🗑️</button></div>';
+                });
+                container.innerHTML = html;
+            } catch (e) { container.innerHTML = '<p style="color:var(--red);">Error</p>'; }
+        }
+
+        // ============ DASHBOARD ============
+        async function loadDashboard() {
+            const container = document.getElementById('dashboardContent');
+            try {
+                const res = await api('/api/stats');
+                if (!res.success) { container.innerHTML = '<p style="color:var(--red);">Failed</p>'; return; }
+                const d = res.data;
+                let dmWarn = d.dm_configured ? '' : '<div style="padding:10px;background:rgba(255,71,87,0.1);border:1px solid var(--red);border-radius:8px;margin-bottom:10px;font-size:12px;">⚠️ <strong>DM message not set!</strong> DMs will NOT be sent. Go to <strong>Set Message</strong> first.</div>';
+                container.innerHTML = dmWarn + '<div class="viewer-stats"><div class="viewer-stat"><div class="val">' + d.total_channels + '</div><div class="lbl">Channels</div></div><div class="viewer-stat"><div class="val">' + d.total_accounts + '</div><div class="lbl">Accounts</div></div><div class="viewer-stat"><div class="val" style="color:var(--red);">' + d.active_lives + '</div><div class="lbl">Live Now</div></div><div class="viewer-stat"><div class="val">' + d.total_dm_sent + '</div><div class="lbl">Total DMs</div></div></div><p style="font-size:12px;color:var(--text-muted);margin-top:8px;">💬 DM: ' + (d.dm_configured ? '✅ ' + (d.dm_message || '').substring(0,60) + '...' : '❌ Not set!') + '</p><p style="font-size:12px;color:var(--text-muted);">🖼️ Media: ' + (d.has_media ? 'Yes' : 'None') + '</p>';
+            } catch (e) { container.innerHTML = '<p style="color:var(--red);">Error</p>'; }
+        }
+
+        // ============ DM MESSAGE ============
+        async function loadDmConfig() {
+            try {
+                const res = await api('/api/dm/config');
+                if (res.success && res.config) {
+                    document.getElementById('dmMessageText').value = res.config.message || '';
+                    document.getElementById('dmImageUrl').value = res.config.media?.url || '';
+                    updateDmPreview();
+                }
+            } catch (e) {}
+        }
+
+        function updateDmPreview() {
+            const msg = document.getElementById('dmMessageText').value;
+            const img = document.getElementById('dmImageUrl').value;
+            const preview = document.getElementById('dmPreview');
+            if (msg || img) { preview.style.display = 'block'; preview.innerHTML = msg + (img ? '<br><img src="' + img + '" onerror="this.style.display=\'none\'" style="max-width:100%;border-radius:8px;margin-top:8px;">' : ''); }
+            else { preview.style.display = 'none'; }
+        }
+
+        document.getElementById('dmMessageText')?.addEventListener('input', updateDmPreview);
+        document.getElementById('dmImageUrl')?.addEventListener('input', updateDmPreview);
+
+        async function saveDmMessage() {
+            const message = document.getElementById('dmMessageText').value;
+            const imageUrl = document.getElementById('dmImageUrl').value;
+            const r = document.getElementById('dmResult');
+            try {
+                const res = await api('/api/dm/config', 'POST', { message, image_url: imageUrl });
+                r.innerHTML = res.success ? '<span style="color:var(--green);">✅ Saved!</span>' : '<span style="color:var(--red);">❌ ' + res.error + '</span>';
+                if (res.success) showToast('DM message updated');
+            } catch (e) { r.innerHTML = '<span style="color:var(--red);">Error</span>'; }
+        }
+
+        async function resetDmRecords() {
+            if (!confirm('Reset ALL DM records? Users will receive DMs again.')) return;
+            await api('/api/dm/reset', 'POST');
+            showToast('DM records reset!');
+        }
+
+        // ============ ACCOUNTS ============
+        async function loadAccounts() {
+            const container = document.getElementById('accountsContent');
+            try {
+                const res = await api('/api/accounts');
+                if (!res.accounts || !res.accounts.length) {
+                    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:10px;">No accounts connected.</p>';
+                    return;
+                }
+                let html = '';
+                res.accounts.forEach(acc => {
+                    html += '<div class="channel-item"><div class="ch-info"><span style="font-size:24px;">👤</span><div><div class="ch-name">' + acc.first_name + '</div><div class="ch-stats">' + acc.phone + ' • @' + (acc.username || 'none') + '</div></div></div></div>';
+                });
+                container.innerHTML = html;
+            } catch (e) { container.innerHTML = '<p style="color:var(--red);">Error</p>'; }
+        }
+
+        function showAddAccountForm() {
+            document.getElementById('addAccountForm').style.display = 'block';
+        }
+
+        let pendingPhone = '';
+        async function sendOTP() {
+            const phone = document.getElementById('accountPhone').value.trim();
+            const r = document.getElementById('accountResult');
+            if (!phone) { r.innerHTML = '<span style="color:var(--red);">Enter phone number</span>'; return; }
+            r.innerHTML = '<div class="spinner"></div>';
+            try {
+                const res = await api('/api/accounts/login', 'POST', { phone });
+                if (res.success) {
+                    pendingPhone = phone;
+                    document.getElementById('otpSection').style.display = 'block';
+                    document.getElementById('sendOtpBtn').style.display = 'none';
+                    r.innerHTML = '<span style="color:var(--green);">✅ OTP sent! Check Telegram.</span>';
+                } else { r.innerHTML = '<span style="color:var(--red);">❌ ' + res.error + '</span>'; }
+            } catch (e) { r.innerHTML = '<span style="color:var(--red);">Error</span>'; }
+        }
+
+        async function verifyOTP() {
+            const otp = document.getElementById('otpCode').value.trim();
+            const pwd = document.getElementById('twoFAPassword').value.trim();
+            const r = document.getElementById('accountResult');
+            if (!otp) { r.innerHTML = '<span style="color:var(--red);">Enter OTP</span>'; return; }
+            r.innerHTML = '<div class="spinner"></div>';
+            try {
+                const res = await api('/api/accounts/verify', 'POST', { phone: pendingPhone, otp, password: pwd });
+                if (res.success) {
+                    r.innerHTML = '<span style="color:var(--green);">✅ Account added: ' + res.account.first_name + '</span>';
+                    document.getElementById('otpSection').style.display = 'none';
+                    document.getElementById('sendOtpBtn').style.display = 'block';
+                    document.getElementById('addAccountForm').style.display = 'none';
+                    showToast('Account logged in!'); loadStats(); loadAccounts();
+                } else if (res.need_password) {
+                    r.innerHTML = '<span style="color:var(--orange);">⚠️ 2FA password required!</span>';
+                } else { r.innerHTML = '<span style="color:var(--red);">❌ ' + res.error + '</span>'; }
+            } catch (e) { r.innerHTML = '<span style="color:var(--red);">Error</span>'; }
+        }
+
+        // ============ ADMIN ============
+        async function loadAdmin() {
+            const container = document.getElementById('adminContent');
+            try {
+                const res = await api('/api/admins');
+                if (!res.success) { container.innerHTML = '<p style="color:var(--red);">Failed</p>'; return; }
+                let html = '<p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Current Admins:</p>';
+                res.admins.forEach(id => {
+                    html += '<div class="channel-item"><div class="ch-info"><span>🛡️</span><div class="ch-name">User ID: ' + id + '</div></div><button class="btn-submit red" style="width:auto;padding:4px 10px;font-size:10px;" onclick="removeAdmin(' + id + ')">✕</button></div>';
+                });
+                container.innerHTML = html;
+            } catch (e) { container.innerHTML = '<p style="color:var(--red);">Error</p>'; }
+        }
+
+        async function addAdmin() {
+            const uid = document.getElementById('newAdminId').value.trim();
+            const r = document.getElementById('adminResult');
+            if (!uid) { r.innerHTML = '<span style="color:var(--red);">Enter User ID</span>'; return; }
+            try {
+                const res = await api('/api/admins', 'POST', { user_id: parseInt(uid) });
+                if (res.success) {
+                    r.innerHTML = '<span style="color:var(--green);">✅ Admin added!</span>';
+                    document.getElementById('newAdminId').value = '';
+                    showToast('Admin added'); loadAdmin();
+                } else { r.innerHTML = '<span style="color:var(--red);">❌ ' + res.error + '</span>'; }
+            } catch (e) { r.innerHTML = '<span style="color:var(--red);">Error</span>'; }
+        }
+
+        async function removeAdmin(userId) {
+            if (!confirm('Remove admin ' + userId + '?')) return;
+            await api('/api/admins/' + userId, 'DELETE');
+            showToast('Admin removed'); loadAdmin();
+        }
+
+        // ============ MODAL CLICK OUTSIDE ============
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) overlay.classList.remove('active');
+            });
+        });
+
+        // ============ INIT ============
+        loadStats();
+        setInterval(loadStats, 15000);
+    </script>
+</body>
